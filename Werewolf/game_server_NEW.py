@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 # ========== 全局客户端 ==========
 client: OpenAI = None
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global client
@@ -37,6 +38,7 @@ async def lifespan(app: FastAPI):
         logger.error(f"初始化失败: {e}")
         raise
 
+
 app = FastAPI(lifespan=lifespan)
 
 # ========== CORS ==========
@@ -47,14 +49,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # ========== 请求体 ==========
 class QueryRequest(BaseModel):
     prompt: str
     role: str = "villager"
     phase: str = "day"
+    agent_id: int = None  # 新增agent_id字段
+
 
 # ========== 工具函数 ==========
-def build_prompt(prompt: str, role: str, phase: str) -> str:
+def build_prompt(prompt: str, role: str, phase: str, agent_id: int = None) -> str:
     """
     根据前端发送的游戏上下文构建给大模型的完整提示。
 
@@ -81,22 +86,34 @@ def build_prompt(prompt: str, role: str, phase: str) -> str:
     role_desc = role_instructions.get(role, "")
     phase_desc = phase_descriptions.get(phase, f"当前阶段：{phase}")
 
+    # 构建玩家身份信息
+    player_identity = ""
+    if agent_id is not None:
+        if agent_id == 0:
+            player_identity = "你是玩家：你\n"
+        else:
+            player_identity = f"你是AI玩家{agent_id}\n"
+
     # 构建提示文本
-    prompt_text = f"[角色指令]\n{role_desc}\n{phase_desc}\n\n" \
-                  f"[输入内容]\n" \
+    prompt_text = f"[输入内容]\n" \
                   "以下是本局游戏的公共信息，包括系统提示和所有玩家的历史发言：\n" \
                   f"{prompt}\n\n" \
+                  f"[玩家身份]\n{player_identity}\n" \
+                  f"[角色指令]\n{role_desc}\n{phase_desc}\n\n" \
                   "[响应要求]\n" \
-                  "请综合所有历史公共日志，结合你的角色视角，用不超过两句中文进行发言或表达你的看法，并注意不要直接暴露自己的身份或阵营。"
+                  "请综合所有历史公共日志，结合你的角色视角，并注意不要直接暴露自己的身份或阵营。"
     return prompt_text
+
 
 def clean_response(text: str) -> str:
     return text.replace("<|im_start|>", "").replace("<|im_end|>", "").strip()
+
 
 # ========== 健康检查 ==========
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "model_loaded": client is not None}
+
 
 # ========== 推理接口 ==========
 @app.post("/api/query")
@@ -104,7 +121,8 @@ async def query(request: QueryRequest):
     if client is None:
         raise HTTPException(status_code=503, detail="DeepSeek客户端未初始化")
 
-    prompt = build_prompt(request.prompt, request.role, request.phase)
+    prompt = build_prompt(request.prompt, request.role, request.phase, request.agent_id)
+    print(f"######### prompt: {prompt}")
     try:
         resp = client.chat.completions.create(
             model="deepseek-chat",
@@ -124,7 +142,9 @@ async def query(request: QueryRequest):
         logger.error(f"推理错误: {e}")
         raise HTTPException(status_code=500, detail=f"推理错误: {e}")
 
+
 # ========== 启动 ==========
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=10021)
