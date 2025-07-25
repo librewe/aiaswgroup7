@@ -1,0 +1,1366 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多智能体狼人杀</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        .game-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .game-title {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 2rem;
+        }
+        .game-status {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+        .phase-indicator {
+            display: flex;
+            gap: 10px;
+        }
+        .phase-step {
+            padding: 8px 16px;
+            border-radius: 20px;
+            background: #f0f0f0;
+            color: #666;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+        .phase-step.active {
+            background: #667eea;
+            color: white;
+        }
+        #game-phase {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #333;
+        }
+        #game-round {
+            font-size: 1rem;
+            color: #666;
+        }
+        .players-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .player-card {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+        .player-card.user {
+            border-color: #667eea;
+        }
+        .player-card.ai {
+            border-color: #95a5a6;
+        }
+        .player-card.dead {
+            opacity: 0.6;
+            background: #f8f8f8;
+        }
+        .player-name {
+            font-size: 1.1rem;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        .player-role {
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+            color: #666;
+        }
+        .player-status {
+            font-size: 0.8rem;
+        }
+        .game-log {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            height: 300px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            border: 1px solid #e9ecef;
+        }
+        .log-entry {
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+        .log-entry.system {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+        }
+        .log-entry.player {
+            background: #f3e5f5;
+            border-left: 4px solid #9c27b0;
+        }
+        .log-entry.werewolf {
+            background: #ffebee;
+            border-left: 4px solid #f44336;
+        }
+        .action-panel {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            min-width: 80px;
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn.primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn.primary:hover:not(:disabled) {
+            background: #5a6fd8;
+        }
+        .btn.danger {
+            background: #e74c3c;
+            color: white;
+        }
+        .btn.danger:hover:not(:disabled) {
+            background: #d63031;
+        }
+        .btn:not(.primary):not(.danger) {
+            background: #95a5a6;
+            color: white;
+        }
+        .btn:not(.primary):not(.danger):hover:not(:disabled) {
+            background: #7f8c8d;
+        }
+        #action-status {
+            color: #666;
+            font-style: italic;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        .modal-content h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .input-group input,
+        .input-group select {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 0.9rem;
+        }
+        .loading {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .phase-timer {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="game-header">
+            <h1 class="game-title">🐺 多智能体狼人杀 (夜晚起始版)</h1>
+            <div class="game-status">
+                <div class="phase-indicator">
+                    <div class="phase-step" id="phase-night">夜晚</div>
+                    <div class="phase-step" id="phase-day">白天</div>
+                    <div class="phase-step" id="phase-vote">投票</div>
+                </div>
+                <div id="game-phase">游戏准备中...</div>
+                <div id="game-round">第 0 回合</div>
+            </div>
+        </div>
+        <div class="players-grid" id="players-grid">
+            <!-- 玩家卡片将在这里动态生成 -->
+        </div>
+        <div class="game-log" id="game-log">
+            <!-- 游戏日志将通过脚本动态生成 -->
+        </div>
+        <div class="action-panel">
+            <div class="action-buttons">
+                <button class="btn primary" id="start-game">开始游戏</button>
+                <button class="btn" id="speak-btn" disabled>发言</button>
+                <button class="btn" id="vote-btn" disabled>投票</button>
+                <button class="btn danger" id="kill-btn" disabled>击杀</button>
+                <!-- 守护按钮已移除，因当前版本不含守卫角色 -->
+                <button class="btn" id="predict-btn" disabled>预言</button>
+                <button class="btn" id="save-btn" disabled>救人</button>
+                <button class="btn danger" id="poison-btn" disabled>毒人</button>
+                <button class="btn" id="skip-witch-btn" disabled>跳过女巫行动</button>
+                <button class="btn" id="api-test-btn">测试API连接</button>
+            </div>
+            <div id="action-status">等待游戏开始...</div>
+        </div>
+    </div>
+    
+    <!-- 模态框 -->
+    <div class="modal" id="speak-modal">
+        <div class="modal-content">
+            <h3>发言</h3>
+            <div class="input-group">
+                <input type="text" id="speak-input" placeholder="输入你的发言内容...">
+                <button class="btn primary" onclick="speak()">发言</button>
+                <button class="btn" onclick="closeModal('speak-modal')">取消</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal" id="vote-modal">
+        <div class="modal-content">
+            <h3>投票出局</h3>
+            <div class="input-group">
+                <select id="vote-select">
+                    <option value="">选择要投票的玩家</option>
+                </select>
+                <button class="btn primary" onclick="vote()">投票</button>
+                <button class="btn" onclick="closeModal('vote-modal')">取消</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal" id="kill-modal">
+        <div class="modal-content">
+            <h3>狼人击杀</h3>
+            <div class="input-group">
+                <select id="kill-select">
+                    <option value="">选择要击杀的玩家</option>
+                </select>
+                <button class="btn danger" onclick="kill()">击杀</button>
+                <button class="btn" onclick="closeModal('kill-modal')">取消</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 守护模态框已移除 -->
+    
+    <div class="modal" id="predict-modal">
+        <div class="modal-content">
+            <h3>预言家查验</h3>
+            <div class="input-group">
+                <select id="predict-select">
+                    <option value="">选择要查验的玩家</option>
+                </select>
+                <button class="btn primary" onclick="predict()">查验</button>
+                <button class="btn" onclick="closeModal('predict-modal')">取消</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal" id="poison-modal">
+        <div class="modal-content">
+            <h3>女巫毒人</h3>
+            <p>请选择要毒杀的玩家（或选择不使用毒药）。</p>
+            <div class="input-group">
+                <select id="poison-select">
+                    <option value="">选择要毒杀的玩家</option>
+                </select>
+                <button class="btn danger" onclick="poison()">使用毒药</button>
+                <button class="btn" onclick="skipPoison()">不使用毒药</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- API设置模态框 -->
+    <div class="modal" id="api-settings-modal">
+        <div class="modal-content">
+            <h3>API设置</h3>
+            <div class="input-group">
+                <input type="text" id="api-url-input" placeholder="API地址 (如: http://localhost:10021)">
+            </div>
+            <div class="input-group">
+                <button class="btn primary" onclick="saveApiSettings()">保存</button>
+                <button class="btn" onclick="closeModal('api-settings-modal')">取消</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="phase-timer" class="phase-timer"></div>
+    
+    <script>
+        // 游戏状态
+        const gameState = {
+            players: [],
+            currentPhase: 'waiting', // 'waiting', 'night', 'day', 'vote', 'ended'
+            currentRound: 0,
+            userPlayer: null,
+            votes: {},
+            actions: {}, // 用于夜晚行动
+            gameLog: [],
+            apiUrl: 'http://localhost:10021',
+            timers: [], // 存储活动定时器ID
+            spokenPlayers: new Set(), // 记录已发言的玩家ID，避免重复发言
+            aiActionInProgress: false, // 标记AI操作是否正在进行
+            // 记录女巫状态
+            witchState: {
+                antidoteUsed: false, // 解药是否已使用
+                poisonUsed: false,    // 毒药是否已使用
+                lastKilledPlayerId: null, // 上一晚被狼人击杀的玩家ID
+                userActionCompleted: false, // 用户女巫是否已完成行动（三选一）
+            },
+            // 每个玩家的嫌疑值，用于AI投票决策
+            suspicion: {},
+            // 预言家已经查验过的玩家ID列表，用于避免重复查验
+            seerMemory: [],
+            // 标记AI发言序列是否正在进行，防止重复触发
+            aiSpeaking: false,
+        };
+
+        // 初始化游戏
+        function initGame() {
+            // 重置状态
+            gameState.players = [];
+            gameState.currentPhase = 'waiting';
+            gameState.currentRound = 0;
+            gameState.votes = {};
+            gameState.actions = {};
+            gameState.gameLog = [];
+            gameState.spokenPlayers.clear();
+            gameState.aiActionInProgress = false;
+            // 重置嫌疑值、预言家记忆和AI发言状态
+            gameState.suspicion = {};
+            gameState.seerMemory = [];
+            gameState.aiSpeaking = false;
+            clearAllTimers();
+            gameState.witchState.antidoteUsed = false;
+            gameState.witchState.poisonUsed = false;
+            gameState.witchState.lastKilledPlayerId = null;
+            gameState.witchState.userActionCompleted = false;
+
+            // 创建玩家（1个用户，7个AI）
+            for (let i = 0; i < 8; i++) {
+                gameState.players.push({
+                    id: i,
+                    name: i === 0 ? '你' : `AI玩家${i}`,
+                    type: i === 0 ? 'user' : 'ai',
+                    role: '', // 待分配
+                    alive: true,
+                    votedBy: []
+                });
+                // 初始化每个玩家的嫌疑值
+                gameState.suspicion[i] = 0;
+            }
+            gameState.userPlayer = gameState.players[0];
+            renderPlayers();
+            updateGameStatus();
+            updateButtons();
+            addLog('系统', '🎮 欢迎来到狼人杀游戏！点击"开始游戏"开始新的一局。', 'system');
+        }
+
+        // 开始游戏
+        async function startGame() {
+            // 重置游戏状态
+            gameState.currentPhase = 'night';
+            gameState.currentRound = 1;
+            gameState.votes = {};
+            gameState.actions = {};
+            gameState.spokenPlayers.clear();
+            gameState.aiActionInProgress = false;
+            // 重置嫌疑值、预言家记忆和AI发言状态
+            gameState.suspicion = {};
+            gameState.seerMemory = [];
+            gameState.aiSpeaking = false;
+            clearAllTimers();
+            gameState.witchState.antidoteUsed = false;
+            gameState.witchState.poisonUsed = false;
+            gameState.witchState.lastKilledPlayerId = null;
+            gameState.witchState.userActionCompleted = false;
+
+            // 重置所有玩家状态
+            gameState.players.forEach(player => {
+                player.alive = true;
+                player.votedBy = [];
+                player.role = '';
+                // 每个玩家嫌疑值重置为0
+                gameState.suspicion[player.id] = 0;
+            });
+            assignRoles();
+            addLog('系统', '🎮 游戏开始！身份已分配完成。', 'system');
+            addLog('系统', `你的身份是：${getRoleName(gameState.userPlayer.role)}`, 'system');
+            // 如果你是狼人，告知你的狼队友
+            if (gameState.userPlayer.role === 'werewolf') {
+                const teammates = gameState.players.filter(p => p.role === 'werewolf' && p.id !== gameState.userPlayer.id);
+                if (teammates.length > 0) {
+                    const names = teammates.map(t => t.name).join('、');
+                    addLog('系统', `你的狼队友是：${names}`, 'system');
+                } else {
+                    addLog('系统', '你是唯一的狼人，请小心行事！', 'system');
+                }
+            }
+            updateGameStatus();
+            updateButtons();
+            renderPlayers();
+
+            // 开始第一夜
+            setTimeout(() => {
+                addLog('法官', `🌙 第${gameState.currentRound}夜，夜幕降临，所有玩家请闭眼。`, 'system');
+                startNightPhase();
+            }, 2000);
+        }
+
+        // 分配身份
+        function assignRoles() {
+            const roles = ['werewolf', 'werewolf', 'seer', 'witch', 'villager', 'villager', 'villager', 'villager'];
+            const shuffledRoles = shuffleArray([...roles]);
+            gameState.players.forEach((player, index) => {
+                player.role = shuffledRoles[index];
+            });
+            gameState.userPlayer = gameState.players[0];
+        }
+
+        // 洗牌算法
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // 获取身份名称
+        function getRoleName(role) {
+            const roleNames = {
+                'werewolf': '🐺 狼人',
+                'seer': '🔮 预言家',
+                'witch': '🧪 女巫',
+                'villager': '👨‍🌾 平民'
+            };
+            return roleNames[role] || '未知';
+        }
+
+        // 夜晚阶段
+        function startNightPhase() {
+            if (gameState.currentPhase === 'ended') return;
+            gameState.currentPhase = 'night';
+            gameState.actions = {};
+            gameState.witchState.userActionCompleted = false; // 重置用户女巫行动状态
+            updateGameStatus();
+            updateButtons();
+            addLog('法官', '🌙 夜幕降临，所有玩家请闭眼。', 'system');
+
+            // 填充行动选择
+            fillActionSelects();
+
+            // AI行动
+            setTimeout(() => aiNightActions(), 2000);
+        }
+
+        // 填充行动选择下拉框
+        function fillActionSelects() {
+            const killSelect = document.getElementById('kill-select');
+            const predictSelect = document.getElementById('predict-select');
+            const poisonSelect = document.getElementById('poison-select');
+            
+            killSelect.innerHTML = '<option value="">选择要击杀的玩家</option>';
+            predictSelect.innerHTML = '<option value="">选择要查验的玩家</option>';
+            poisonSelect.innerHTML = '<option value="">选择要毒杀的玩家</option>';
+
+            const alivePlayers = gameState.players.filter(p => p.alive && p.id !== gameState.userPlayer.id);
+            alivePlayers.forEach(player => {
+                const option1 = document.createElement('option');
+                option1.value = player.id;
+                option1.textContent = player.name;
+                killSelect.appendChild(option1.cloneNode(true));
+
+                const option2 = document.createElement('option');
+                option2.value = player.id;
+                option2.textContent = player.name;
+                predictSelect.appendChild(option2.cloneNode(true));
+
+                const option3 = document.createElement('option');
+                option3.value = player.id;
+                option3.textContent = player.name;
+                poisonSelect.appendChild(option3.cloneNode(true));
+            });
+        }
+
+        // AI夜晚行动
+        async function aiNightActions() {
+            if (gameState.currentPhase !== 'night') return;
+            gameState.aiActionInProgress = true;
+            addLog('系统', '🤖 AI正在执行夜晚行动...', 'system');
+
+            // ------------------------ 狼人行动 ------------------------
+            // 如果用户不是狼人，则由AI狼人集体选择击杀目标；否则等待用户决策
+            const userIsWerewolf = isUserWerewolf();
+            const aliveAIWolves = gameState.players.filter(p => p.alive && p.role === 'werewolf' && p.type === 'ai');
+            if (!userIsWerewolf && aliveAIWolves.length > 0) {
+                const candidates = gameState.players.filter(p => p.alive && p.role !== 'werewolf');
+                if (candidates.length > 0) {
+                    const target = candidates[Math.floor(Math.random() * candidates.length)];
+                    gameState.actions.killTarget = target.id;
+                    // 记录目标供女巫使用解药
+                    gameState.witchState.lastKilledPlayerId = target.id;
+                    // 一旦狼人团队选择了击杀目标，更新按钮状态，让女巫能够看到可救人
+                    updateButtons();
+                    // 不向日志透露具体击杀信息，以保持夜间信息隐蔽
+                }
+            }
+
+            // ------------------------ 预言家行动 ------------------------
+            // AI预言家查验没有查验过的玩家，更新嫌疑值但不广播结果
+            const seer = gameState.players.find(p => p.alive && p.role === 'seer' && p.type === 'ai');
+            if (seer) {
+                // 找到未查验的存活玩家
+                const untested = gameState.players.filter(p => p.alive && p.id !== seer.id && !gameState.seerMemory.includes(p.id));
+                const candidates = untested.length > 0 ? untested : gameState.players.filter(p => p.alive && p.id !== seer.id);
+                if (candidates.length > 0) {
+                    const target = candidates[Math.floor(Math.random() * candidates.length)];
+                    gameState.actions.seerTarget = target.id;
+                    // 记录查验历史
+                    gameState.seerMemory.push(target.id);
+                    const isWolf = target.role === 'werewolf';
+                    // 更新嫌疑值：查验狼人则提高嫌疑，查验好人则降低嫌疑
+                    if (gameState.suspicion[target.id] === undefined) gameState.suspicion[target.id] = 0;
+                    gameState.suspicion[target.id] += isWolf ? 10 : -3;
+                    // 限制嫌疑值范围，避免极端
+                    if (gameState.suspicion[target.id] < -10) gameState.suspicion[target.id] = -10;
+                }
+            }
+
+            // ------------------------ 女巫行动 ------------------------
+            // AI女巫只能在解药与毒药之间选择其一，不会同时使用
+            const witch = gameState.players.find(p => p.alive && p.role === 'witch' && p.type === 'ai');
+            if (witch) {
+                const hasAntidote = !gameState.witchState.antidoteUsed;
+                const hasPoison = !gameState.witchState.poisonUsed;
+                let usedAntidote = false;
+                // 如果狼人的击杀目标存在，则50%概率使用解药
+                if (hasAntidote && (gameState.actions.killTarget !== undefined)) {
+                    if (Math.random() > 0.5) {
+                        gameState.actions.witchSave = gameState.actions.killTarget;
+                        gameState.witchState.antidoteUsed = true;
+                        usedAntidote = true;
+                    }
+                }
+                // 如果没有使用解药，考虑使用毒药
+                if (!usedAntidote && hasPoison) {
+                    // 30%概率发动毒药
+                    if (Math.random() > 0.7) {
+                        // 可毒杀的目标为存活玩家中排除自己和击杀目标
+                        const poisonCandidates = gameState.players.filter(p => p.alive && p.id !== witch.id && p.id !== gameState.actions.killTarget);
+                        if (poisonCandidates.length > 0) {
+                            const target = poisonCandidates[Math.floor(Math.random() * poisonCandidates.length)];
+                            gameState.actions.witchPoison = target.id;
+                            gameState.witchState.poisonUsed = true;
+                        }
+                    }
+                }
+            }
+
+            gameState.aiActionInProgress = false;
+
+            // 等待用户完成操作或3秒后处理结果
+            setTimeout(() => {
+                checkAndProceedNight();
+            }, 3000);
+        }
+
+        // 检查并推进夜晚流程
+        function checkAndProceedNight() {
+            if (gameState.currentPhase !== 'night') return;
+
+            // 检查用户是否需要完成夜晚行动
+            const userNeedsAction = (
+                (isUserWerewolf() && !gameState.actions.userKillTarget) ||
+                (isUserSeer() && !gameState.actions.userSeerTarget) ||
+                (isUserWitch() && !gameState.witchState.userActionCompleted)
+            );
+
+            if (userNeedsAction && !gameState.aiActionInProgress) {
+                addLog('系统', '⏳ 等待用户完成夜晚行动...', 'system');
+                return;
+            }
+
+            // 如果AI还在行动中，等待
+            if (gameState.aiActionInProgress) {
+                addLog('系统', '⏳ 等待AI完成夜晚行动...', 'system');
+                setTimeout(() => checkAndProceedNight(), 1000);
+                return;
+            }
+
+            // 所有行动完成，处理夜晚结果
+            processNightResult();
+        }
+
+        // 处理夜晚结果
+        function processNightResult() {
+            addLog('法官', '☀️ 天亮了！', 'system');
+            let deaths = [];
+
+            // 合并用户和AI的行动
+            const killTargetId = gameState.actions.userKillTarget || gameState.actions.killTarget;
+            const witchSaveId = gameState.actions.userWitchSave || gameState.actions.witchSave;
+            const witchPoisonId = gameState.actions.userWitchPoison || gameState.actions.witchPoison;
+
+            // 处理毒杀
+            if (witchPoisonId !== undefined) {
+                const poisonedPlayer = gameState.players.find(p => p.id === witchPoisonId);
+                if (poisonedPlayer && poisonedPlayer.alive) {
+                    poisonedPlayer.alive = false;
+                    deaths.push(`${poisonedPlayer.name}（${getRoleName(poisonedPlayer.role)}）被毒杀`);
+                }
+            }
+
+            // 处理击杀（如果未被救）
+            if (killTargetId !== undefined && killTargetId !== witchSaveId) {
+                const killedPlayer = gameState.players.find(p => p.id === killTargetId);
+                if (killedPlayer && killedPlayer.alive) {
+                    killedPlayer.alive = false;
+                    gameState.witchState.lastKilledPlayerId = killTargetId;
+                    deaths.push(`${killedPlayer.name}（${getRoleName(killedPlayer.role)}）被狼人击杀`);
+                }
+            } else if (killTargetId !== undefined && killTargetId === witchSaveId) {
+                const savedPlayer = gameState.players.find(p => p.id === killTargetId);
+                if (savedPlayer) {
+                    addLog('法官', `🛡️ 昨夜 ${savedPlayer.name} 被女巫救下，平安无事！`, 'system');
+                    gameState.witchState.lastKilledPlayerId = killTargetId;
+                }
+            }
+
+            if (deaths.length > 0) {
+                addLog('法官', `💀 昨夜发生惨案：${deaths.join('，')}！`, 'system');
+            } else if (!(witchSaveId && killTargetId)) {
+                addLog('法官', '😴 昨夜平安无事，没有人死亡。', 'system');
+            }
+
+            renderPlayers();
+
+            // 检查游戏是否结束
+            if (checkGameEnd()) {
+                return;
+            }
+
+            // 进入白天阶段
+            setTimeout(() => {
+                gameState.spokenPlayers.clear();
+                startDayPhase();
+            }, 3000);
+        }
+
+        // 白天阶段
+        async function startDayPhase() {
+            if (gameState.currentPhase === 'ended') return;
+            gameState.currentPhase = 'day';
+            gameState.spokenPlayers.clear();
+            // 重置AI发言状态，开始新的发言序列
+            gameState.aiSpeaking = false;
+            updateGameStatus();
+            updateButtons();
+            addLog('法官', `☀️ 第${gameState.currentRound}天，天亮了，所有玩家请开始自由讨论。`, 'system');
+
+            // 延迟后开始AI发言
+            setTimeout(() => {
+                aiPlayersSpeakSequence();
+            }, 2000);
+
+            // 30秒后自动进入投票
+            const timeoutId = setTimeout(() => {
+                if (gameState.currentPhase === 'day') {
+                    addLog('法官', '⏰ 讨论时间到，进入投票阶段。', 'system');
+                    startVotePhase();
+                }
+            }, 30000);
+            gameState.timers.push(timeoutId);
+        }
+
+        // AI玩家按顺序发言
+        async function aiPlayersSpeakSequence() {
+            if (gameState.currentPhase !== 'day' || gameState.currentPhase === 'ended') {
+                return;
+            }
+            // 如果AI发言序列尚未启动，标记正在发言，以避免多次调用
+            if (!gameState.aiSpeaking) {
+                gameState.aiSpeaking = true;
+            }
+            const aliveAiPlayers = gameState.players.filter(p => p.alive && p.type === 'ai');
+            if (aliveAiPlayers.length === 0) {
+                // 无AI存活，直接进入投票
+                gameState.aiSpeaking = false;
+                setTimeout(() => startVotePhase(), 1000);
+                return;
+            }
+            const playersToSpeak = aliveAiPlayers.filter(p => !gameState.spokenPlayers.has(p.id));
+            if (playersToSpeak.length === 0) {
+                // 所有AI已发言，结束发言序列，进入投票
+                gameState.aiSpeaking = false;
+                setTimeout(() => startVotePhase(), 1000);
+                return;
+            }
+            // 当前发言者
+            const speaker = playersToSpeak[0];
+            const thinkingMsgId = showThinkingIndicator(speaker.name);
+            try {
+                const context = buildGameContext(speaker);
+                const result = await queryQwenModel(context, speaker.role, 'day');
+                const logElement = document.querySelector(`#log-${thinkingMsgId}`);
+                if (logElement) {
+                    let response = result.response || "AI未响应";
+                    // 过滤可能暴露身份的词语，避免AI自曝家门
+                    response = filterAiResponse(response);
+                    logElement.innerHTML = `<strong>${speaker.name}:</strong> ${response}`;
+                }
+                gameState.spokenPlayers.add(speaker.id);
+                // 下一名AI延迟3~6秒发言，减缓节奏
+                setTimeout(() => {
+                    aiPlayersSpeakSequence();
+                }, 3000 + Math.random() * 3000);
+            } catch (error) {
+                console.error(`AI发言错误 [${speaker.name}]:`, error);
+                const logElement = document.querySelector(`#log-${thinkingMsgId}`);
+                if (logElement) {
+                    logElement.textContent = `${speaker.name}: 发言失败`;
+                }
+                gameState.spokenPlayers.add(speaker.id);
+                setTimeout(() => {
+                    aiPlayersSpeakSequence();
+                }, 2000);
+            }
+        }
+
+        // 构建游戏上下文
+        function buildGameContext(player) {
+            let context = `当前是第${gameState.currentRound}天，白天讨论阶段。
+存活玩家: `;
+            gameState.players.filter(p => p.alive).forEach(p => {
+                context += `${p.name}、`;
+            });
+            context += "\n近期游戏事件:\n";
+            const recentLogs = gameState.gameLog.slice(-5).map(log => `${log.sender}: ${log.message}`);
+            context += recentLogs.join("\n");
+            return context;
+        }
+
+        // 显示AI思考指示器
+        function showThinkingIndicator(playerName) {
+            const logEntry = addLog(playerName, '正在思考... <span class="loading"></span>', 'player');
+            return logEntry.id;
+        }
+
+        // 过滤AI回复中的角色信息，避免AI自报家门
+        function filterAiResponse(text) {
+            if (!text || typeof text !== 'string') return text;
+            let filtered = text;
+            // 列出可能暴露身份的关键词
+            const keywords = ['预言家', '女巫', '狼人', '平民', '好人', '村民'];
+            keywords.forEach(keyword => {
+                // 全局替换关键词，防止暴露身份
+                const regex = new RegExp(keyword, 'g');
+                filtered = filtered.replace(regex, '某人');
+            });
+            return filtered;
+        }
+
+        // 调用后端API
+        async function queryQwenModel(prompt, role = "villager", phase = "day") {
+            try {
+                const response = await fetch(`${gameState.apiUrl}/api/query`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: prompt,
+                        role: role,
+                        phase: phase
+                    })
+                });
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`API错误: ${response.status} - ${errorText}`);
+                }
+                return await response.json();
+            } catch (error) {
+                console.error("API调用失败:", error);
+                return {
+                    response: "AI暂时无法响应",
+                    status: "error"
+                };
+            }
+        }
+
+        // 投票阶段
+        function startVotePhase() {
+            if (gameState.currentPhase === 'ended') return;
+            clearAllTimers();
+            gameState.currentPhase = 'vote';
+            gameState.votes = {};
+            updateGameStatus();
+            updateButtons();
+
+            addLog('法官', `🗳️ 投票环节开始。存活玩家：${
+                gameState.players.filter(p => p.alive).map(p => p.name).join(', ')
+            }`, 'system');
+
+            // 填充投票选项
+            const voteSelect = document.getElementById('vote-select');
+            voteSelect.innerHTML = '<option value="">选择要投票的玩家</option>';
+            gameState.players
+                .filter(p => p.alive && p.id !== gameState.userPlayer.id)
+                .forEach(player => {
+                    const option = document.createElement('option');
+                    option.value = player.id;
+                    option.textContent = player.name;
+                    voteSelect.appendChild(option);
+                });
+
+            // AI投票
+            setTimeout(() => {
+                if (gameState.currentPhase === 'vote') {
+                    aiPlayersVote();
+                }
+            }, 3000);
+
+            // 20秒后处理投票结果
+            const timeoutId = setTimeout(() => {
+                if (gameState.currentPhase === 'vote') {
+                    addLog('法官', '⏰ 投票时间到，统计结果。', 'system');
+                    processVoteResult();
+                }
+            }, 20000);
+            gameState.timers.push(timeoutId);
+        }
+
+        // AI投票逻辑
+        async function aiPlayersVote() {
+            if (gameState.currentPhase !== 'vote') return;
+            const aliveAiPlayers = gameState.players.filter(p => p.alive && p.type === 'ai');
+            const alivePlayers = gameState.players.filter(p => p.alive);
+
+            for (const voter of aliveAiPlayers) {
+                // 候选人: 所有存活且不是自己
+                const candidates = alivePlayers.filter(p => p.id !== voter.id);
+                if (candidates.length > 0) {
+                    // 根据嫌疑值选择目标
+                    let maxSuspicion = -Infinity;
+                    candidates.forEach(c => {
+                        // 默认嫌疑值为0
+                        let sus = gameState.suspicion[c.id] || 0;
+                        // 狼人更倾向投票嫌疑值低（保护同伴）；普通玩家更倾向投票嫌疑值高
+                        if (voter.role === 'werewolf') {
+                            sus = -sus;
+                        }
+                        if (sus > maxSuspicion) maxSuspicion = sus;
+                    });
+                    // 如果嫌疑值全为0，则随机选择
+                    let target;
+                    if (maxSuspicion === 0) {
+                        target = candidates[Math.floor(Math.random() * candidates.length)];
+                    } else {
+                        const topCandidates = candidates.filter(c => {
+                            let sus = gameState.suspicion[c.id] || 0;
+                            if (voter.role === 'werewolf') sus = -sus;
+                            return sus >= maxSuspicion;
+                        });
+                        target = topCandidates[Math.floor(Math.random() * topCandidates.length)];
+                    }
+                    gameState.votes[voter.id] = target.id;
+                    addLog('系统', `${voter.name} 投票给 ${target.name}`, 'player');
+                }
+                // 延迟不同AI投票时间，模拟真实投票过程
+                await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
+            }
+        }
+
+        // 处理投票结果
+        function processVoteResult() {
+            clearAllTimers();
+            const voteCounts = {};
+            Object.values(gameState.votes).forEach(targetId => {
+                voteCounts[targetId] = (voteCounts[targetId] || 0) + 1;
+            });
+
+            let maxVotes = 0;
+            let eliminatedPlayerIds = [];
+            for (const [playerId, votes] of Object.entries(voteCounts)) {
+                const id = parseInt(playerId);
+                if (votes > maxVotes) {
+                    maxVotes = votes;
+                    eliminatedPlayerIds = [id];
+                } else if (votes === maxVotes && votes > 0) {
+                    eliminatedPlayerIds.push(id);
+                }
+            }
+
+            let message = "";
+            if (eliminatedPlayerIds.length === 0 || maxVotes === 0) {
+                message = '📊 本轮无人投票或平票，无人出局。';
+            } else if (eliminatedPlayerIds.length === 1) {
+                const eliminatedPlayer = gameState.players.find(p => p.id === eliminatedPlayerIds[0]);
+                if (eliminatedPlayer) {
+                    eliminatedPlayer.alive = false;
+                    message = `💀 投票结束，${eliminatedPlayer.name}（${getRoleName(eliminatedPlayer.role)}）被投票出局！`;
+                }
+            } else {
+                const names = eliminatedPlayerIds.map(id => gameState.players.find(p => p.id === id)?.name).join(', ');
+                message = `📊 ${names} 得票数相同，平票无人出局。`;
+            }
+            addLog('法官', message, 'system');
+            renderPlayers();
+
+            if (checkGameEnd()) {
+                return;
+            }
+
+            gameState.currentRound++;
+            setTimeout(() => {
+                startNightPhase();
+            }, 3000);
+        }
+
+        // 检查游戏是否结束
+        function checkGameEnd() {
+            const alivePlayers = gameState.players.filter(p => p.alive);
+            const aliveWerewolves = alivePlayers.filter(p => p.role === 'werewolf');
+            const aliveVillagers = alivePlayers.filter(p => p.role !== 'werewolf');
+
+            if (aliveWerewolves.length === 0) {
+                gameState.currentPhase = 'ended';
+                addLog('法官', '🎉 好人胜利！所有狼人都被消灭了！', 'system');
+                updateGameStatus();
+                updateButtons();
+                clearAllTimers();
+                return true;
+            }
+            if (aliveWerewolves.length >= aliveVillagers.length) {
+                gameState.currentPhase = 'ended';
+                addLog('法官', '🐺 狼人胜利！狼人数量已经达到或超过好人！', 'system');
+                updateGameStatus();
+                updateButtons();
+                clearAllTimers();
+                return true;
+            }
+            return false;
+        }
+
+        // 清除所有定时器
+        function clearAllTimers() {
+            gameState.timers.forEach(id => clearTimeout(id));
+            gameState.timers = [];
+        }
+
+        // 辅助函数
+        function isUserWitch() {
+            return gameState.userPlayer && gameState.userPlayer.alive && gameState.userPlayer.role === 'witch';
+        }
+        
+        function isUserWerewolf() {
+            return gameState.userPlayer && gameState.userPlayer.alive && gameState.userPlayer.role === 'werewolf';
+        }
+        
+        function isUserSeer() {
+            return gameState.userPlayer && gameState.userPlayer.alive && gameState.userPlayer.role === 'seer';
+        }
+
+        // 用户行动函数
+        function speak() {
+            const input = document.getElementById('speak-input');
+            const message = input.value.trim();
+            if (message) {
+                addLog(gameState.userPlayer.name, message, 'player');
+                gameState.spokenPlayers.add(gameState.userPlayer.id);
+                input.value = '';
+                closeModal('speak-modal');
+                
+                if (gameState.currentPhase === 'day') {
+                    const alivePlayers = gameState.players.filter(p => p.alive);
+                    const allSpoken = alivePlayers.every(p => gameState.spokenPlayers.has(p.id));
+                    if (allSpoken) {
+                        addLog('法官', '📢 所有玩家发言完毕，进入投票阶段。', 'system');
+                        setTimeout(() => startVotePhase(), 1000);
+                    }
+                }
+            }
+        }
+
+        function vote() {
+            const select = document.getElementById('vote-select');
+            const targetId = parseInt(select.value);
+            if (!isNaN(targetId) && targetId >= 0) {
+                const target = gameState.players.find(p => p.id === targetId);
+                if (target) {
+                    gameState.votes[gameState.userPlayer.id] = targetId;
+                    addLog('系统', `你投票给了 ${target.name}`, 'system');
+                    closeModal('vote-modal');
+                    updateButtons();
+                    
+                    if (gameState.currentPhase === 'vote') {
+                        const alivePlayers = gameState.players.filter(p => p.alive);
+                        const votesCast = Object.keys(gameState.votes).length;
+                        if (votesCast >= alivePlayers.length - 1) {
+                            addLog('法官', '📢 所有玩家投票完毕，统计结果。', 'system');
+                            setTimeout(() => processVoteResult(), 1000);
+                        }
+                    }
+                }
+            }
+        }
+
+        function kill() {
+            const select = document.getElementById('kill-select');
+            const targetId = parseInt(select.value);
+            if (!isNaN(targetId) && targetId >= 0) {
+                gameState.actions.userKillTarget = targetId;
+                const target = gameState.players.find(p => p.id === targetId);
+                // 记录给女巫参考，便于其救人
+                gameState.witchState.lastKilledPlayerId = targetId;
+                addLog('系统', `你选择击杀 ${target.name}`, 'werewolf');
+                closeModal('kill-modal');
+                updateButtons();
+                checkAndProceedNight();
+            }
+        }
+
+        function predict() {
+            const select = document.getElementById('predict-select');
+            const targetId = parseInt(select.value);
+            if (!isNaN(targetId) && targetId >= 0) {
+                gameState.actions.userSeerTarget = targetId;
+                const target = gameState.players.find(p => p.id === targetId);
+                const result = target.role === 'werewolf' ? '狼人' : '好人';
+                addLog('系统', `你查验了 ${target.name}，结果是：${result}`, 'system');
+                // 记录预言家记忆，避免连续查验同一人，并更新嫌疑值供AI参考
+                if (!gameState.seerMemory.includes(targetId)) {
+                    gameState.seerMemory.push(targetId);
+                }
+                if (gameState.suspicion[targetId] === undefined) gameState.suspicion[targetId] = 0;
+                gameState.suspicion[targetId] += (result === '狼人' ? 10 : -3);
+                if (gameState.suspicion[targetId] < -10) gameState.suspicion[targetId] = -10;
+                closeModal('predict-modal');
+                updateButtons();
+                checkAndProceedNight();
+            }
+        }
+
+        // 女巫救人（现在是三选一的一部分）
+        function savePlayer() {
+            // 确定当前狼人的击杀目标（可能来自玩家或AI）
+            const pendingKillId = gameState.actions.userKillTarget ?? gameState.actions.killTarget;
+            if (pendingKillId !== undefined && pendingKillId !== null && !gameState.witchState.antidoteUsed) {
+                const target = gameState.players.find(p => p.id === pendingKillId);
+                if (target) {
+                    gameState.actions.userWitchSave = pendingKillId;
+                    gameState.witchState.antidoteUsed = true;
+                    addLog('系统', `你使用解药救了 ${target.name}`, 'system');
+                }
+            }
+            gameState.witchState.userActionCompleted = true;
+            updateButtons();
+            checkAndProceedNight();
+        }
+
+        // 女巫毒人
+        function poison() {
+            const select = document.getElementById('poison-select');
+            const targetId = parseInt(select.value);
+            if (!isNaN(targetId) && targetId >= 0 && !gameState.witchState.poisonUsed) {
+                gameState.actions.userWitchPoison = targetId;
+                const target = gameState.players.find(p => p.id === targetId);
+                if (target) {
+                    gameState.witchState.poisonUsed = true;
+                    addLog('系统', `你使用毒药毒死了 ${target.name}`, 'system');
+                }
+            }
+            gameState.witchState.userActionCompleted = true;
+            closeModal('poison-modal');
+            updateButtons();
+            checkAndProceedNight();
+        }
+
+        function skipPoison() {
+            gameState.witchState.userActionCompleted = true;
+            closeModal('poison-modal');
+            updateButtons();
+            checkAndProceedNight();
+        }
+
+        // 女巫跳过所有行动
+        function skipWitchAction() {
+            gameState.witchState.userActionCompleted = true;
+            addLog('系统', '你选择不使用任何药水', 'system');
+            updateButtons();
+            checkAndProceedNight();
+        }
+
+        // 测试API连接
+        async function testApiConnection() {
+            const testBtn = document.getElementById('api-test-btn');
+            const originalText = testBtn.textContent;
+            testBtn.disabled = true;
+            testBtn.textContent = "测试中...";
+            try {
+                const response = await queryQwenModel("简单回复'你好'来测试连接");
+                if (response && response.response) {
+                    alert(`API连接成功！模型回复: ${response.response}`);
+                } else {
+                    alert("API连接失败，请检查设置");
+                }
+            } catch (error) {
+                alert("API连接失败: " + error.message);
+            } finally {
+                testBtn.disabled = false;
+                testBtn.textContent = originalText;
+            }
+        }
+
+        // UI 相关函数
+        function renderPlayers() {
+            const grid = document.getElementById('players-grid');
+            grid.innerHTML = '';
+            gameState.players.forEach(player => {
+                const card = document.createElement('div');
+                card.className = `player-card ${player.type} ${!player.alive ? 'dead' : ''}`;
+                let roleDisplay = '';
+                if (player.type === 'user' || !player.alive) {
+                    roleDisplay = getRoleName(player.role);
+                } else {
+                    roleDisplay = '❓ 未知';
+                }
+                card.innerHTML = `
+                    <div class="player-name">${player.name}</div>
+                    <div class="player-role">${roleDisplay}</div>
+                    <div class="player-status">${player.alive ? '💚 存活' : '💀 已出局'}</div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function updateGameStatus() {
+            const phaseElement = document.getElementById('game-phase');
+            const roundElement = document.getElementById('game-round');
+            const phaseNames = {
+                'waiting': '🎮 游戏准备中',
+                'night': '🌙 夜晚行动',
+                'day': '☀️ 白天讨论',
+                'vote': '🗳️ 投票阶段',
+                'ended': '🏁 游戏结束'
+            };
+            phaseElement.textContent = phaseNames[gameState.currentPhase] || '未知阶段';
+            roundElement.textContent = `第 ${gameState.currentRound} 回合`;
+            
+            document.querySelectorAll('.phase-step').forEach(step => {
+                step.classList.remove('active');
+            });
+            if (gameState.currentPhase === 'day') {
+                document.getElementById('phase-day').classList.add('active');
+            } else if (gameState.currentPhase === 'night') {
+                document.getElementById('phase-night').classList.add('active');
+            } else if (gameState.currentPhase === 'vote') {
+                document.getElementById('phase-vote').classList.add('active');
+            }
+        }
+
+        function updateButtons() {
+            const startBtn = document.getElementById('start-game');
+            const speakBtn = document.getElementById('speak-btn');
+            const voteBtn = document.getElementById('vote-btn');
+            const killBtn = document.getElementById('kill-btn');
+            // const protectBtn = document.getElementById('protect-btn'); // 已移除守护功能
+            const predictBtn = document.getElementById('predict-btn');
+            const saveBtn = document.getElementById('save-btn');
+            const poisonBtn = document.getElementById('poison-btn');
+            const skipWitchBtn = document.getElementById('skip-witch-btn');
+            const actionStatus = document.getElementById('action-status');
+
+            // 重置所有按钮
+            // 移除protectBtn后调整数组
+            [speakBtn, voteBtn, killBtn, predictBtn, saveBtn, poisonBtn, skipWitchBtn].forEach(btn => {
+                btn.disabled = true;
+            });
+
+            if (!gameState.userPlayer || !gameState.userPlayer.alive) {
+                actionStatus.textContent = '💀 你已出局，无法行动。';
+                startBtn.disabled = true;
+                return;
+            }
+            
+            if (gameState.currentPhase === 'waiting') {
+                startBtn.disabled = false;
+                actionStatus.textContent = '等待游戏开始...';
+            } else if (gameState.currentPhase === 'day') {
+                speakBtn.disabled = false;
+                actionStatus.textContent = '白天讨论阶段，你可以发言。';
+            } else if (gameState.currentPhase === 'vote') {
+                voteBtn.disabled = false;
+                actionStatus.textContent = '投票阶段，请选择要投票的玩家。';
+            } else if (gameState.currentPhase === 'night') {
+                actionStatus.textContent = '夜晚行动阶段，请选择你的行动。';
+                
+                if (isUserWerewolf() && !gameState.actions.userKillTarget) {
+                    killBtn.disabled = false;
+                }
+                
+                if (isUserSeer() && !gameState.actions.userSeerTarget) {
+                    predictBtn.disabled = false;
+                }
+                
+                if (isUserWitch() && !gameState.witchState.userActionCompleted) {
+                    // 女巫可以选择救人、毒人或跳过
+                    skipWitchBtn.disabled = false;
+
+                    // 当前狼人的击杀目标（用户或AI）
+                    const pendingKillId = gameState.actions.userKillTarget ?? gameState.actions.killTarget;
+
+                    // 如果有待击杀目标且解药未用，可以救人
+                    if (pendingKillId !== undefined && pendingKillId !== null && !gameState.witchState.antidoteUsed) {
+                        saveBtn.disabled = false;
+                    }
+                    // 如果毒药未用，可以毒人
+                    if (!gameState.witchState.poisonUsed) {
+                        poisonBtn.disabled = false;
+                    }
+                }
+            } else if (gameState.currentPhase === 'ended') {
+                startBtn.disabled = false;
+                actionStatus.textContent = '游戏已结束，点击"开始游戏"重新开始。';
+            }
+        }
+
+        // 添加游戏日志
+        function addLog(sender, message, type = 'system') {
+            const logEntry = {
+                id: Date.now(),
+                sender,
+                message,
+                timestamp: new Date().toLocaleTimeString(),
+                type
+            };
+            gameState.gameLog.push(logEntry);
+            const logElement = document.createElement('div');
+            logElement.className = `log-entry ${type}`;
+            logElement.id = `log-${logEntry.id}`;
+            logElement.innerHTML = `<strong>${sender}:</strong> ${message}`;
+            document.getElementById('game-log').appendChild(logElement);
+            document.getElementById('game-log').scrollTop = document.getElementById('game-log').scrollHeight;
+            return logEntry;
+        }
+
+        // 打开模态框
+        function openModal(modalId) {
+            document.getElementById(modalId).style.display = 'block';
+        }
+
+        // 关闭模态框
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        // 保存API设置
+        function saveApiSettings() {
+            const apiUrl = document.getElementById('api-url-input').value.trim();
+            if (apiUrl) {
+                gameState.apiUrl = apiUrl;
+                addLog('系统', `API地址已设置为: ${apiUrl}`, 'system');
+                closeModal('api-settings-modal');
+            }
+        }
+
+        // 初始化事件监听
+        document.getElementById('start-game').addEventListener('click', startGame);
+        document.getElementById('speak-btn').addEventListener('click', () => openModal('speak-modal'));
+        document.getElementById('vote-btn').addEventListener('click', () => openModal('vote-modal'));
+        document.getElementById('kill-btn').addEventListener('click', () => openModal('kill-modal'));
+        // 守护按钮及其事件已移除
+        document.getElementById('predict-btn').addEventListener('click', () => openModal('predict-modal'));
+        document.getElementById('save-btn').addEventListener('click', savePlayer);
+        document.getElementById('poison-btn').addEventListener('click', () => openModal('poison-modal'));
+        document.getElementById('skip-witch-btn').addEventListener('click', skipWitchAction);
+        document.getElementById('api-test-btn').addEventListener('click', testApiConnection);
+
+        // 键盘事件监听
+        document.getElementById('speak-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                speak();
+            }
+        });
+
+        // 初始化游戏
+        initGame();
+    </script>
+</body>
+</html>
